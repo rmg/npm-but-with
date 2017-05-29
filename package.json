@@ -1,0 +1,22 @@
+{
+  "name": "npm-but-with",
+  "version": "1.0.0",
+  "description": "npm, but with X published to it",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rmg/npm-but-with.git"
+  },
+  "keywords": [
+    "npm"
+  ],
+  "author": "Ryan Graham",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rmg/npm-but-with/issues"
+  },
+  "homepage": "https://github.com/rmg/npm-but-with#readme"
+}
