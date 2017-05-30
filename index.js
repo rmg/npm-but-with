@@ -15,7 +15,7 @@ const NOW = new Date();
 
 const upstreamGet = /^https:/.test(UPSTREAM) ? https.get : http.get;
 
-const seeds = {};
+const seeds = new Map();
 
 addSeeds(process.argv.slice(2)).then(run).catch(err => {
   console.error('error:', err);
@@ -55,7 +55,10 @@ function makeSeedResponders(seed) {
   };
   upstreamPkgJson.time.modified = upstreamPkgJson.time[version] = NOW;
   // accept requests with and without the trailing '/'
-  seeds[metaPath] = seeds[metaPath + '/'] = function metaResponse(req, res) {
+  seeds.set(metaPath, metaResponse);
+  seeds.set(metaPath + '/', metaResponse);
+  seeds.set(tgzPath, tarballResponse);
+  function metaResponse(req, res) {
     pkgJson.dist.tarball = `http://${req.headers.host}${tgzPath}`;
     const body = Buffer.from(JSON.stringify(upstreamPkgJson));
     res.writeHead(200, {
@@ -63,14 +66,14 @@ function makeSeedResponders(seed) {
       'Content-Length': body.byteLength
     });
     res.end(body);
-  };
-  seeds[tgzPath] = function tarballResponse(req, res) {
+  }
+  function tarballResponse(req, res) {
     res.writeHead(200, {
       'Content-Type': 'application/octet',
       'Content-Length': tgzSize
     });
     fs.createReadStream(seed.path).pipe(res);
-  };
+  }
 }
 
 function processTarball(tgzName) {
@@ -182,7 +185,7 @@ function onListen() {
 
 function onRequest(req, res) {
   req.started = process.hrtime();
-  const seedResponder = seeds[req.url];
+  const seedResponder = seeds.get(req.url);
   if (seedResponder) {
     return seedResponder(req, res);
   }
