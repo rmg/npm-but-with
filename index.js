@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 4873;
 const UPSTREAM =
   process.env.npm_config_registry || 'https://registry.npmjs.org';
 const registry = makeProxy(UPSTREAM);
+const NOW = new Date();
 
 const upstreamGet = /^https:/.test(UPSTREAM) ? https.get : http.get;
 
@@ -50,12 +51,11 @@ function makeSeedResponders(seed) {
   upstreamPkgJson['dist-tags'].latest = pkgJson.version;
   pkgJson.dist = {
     shasum: shasum,
-    tarball: 'TBD'
+    tarball: 'generate me when we know what Host header the client sent'
   };
-  upstreamPkgJson.time.modified = upstreamPkgJson.time[
-    version
-  ] = new Date().toJSON();
-  seeds[metaPath] = seeds[`${metaPath}/`] = function metaResponse(req, res) {
+  upstreamPkgJson.time.modified = upstreamPkgJson.time[version] = NOW;
+  // accept requests with and without the trailing '/'
+  seeds[metaPath] = seeds[metaPath + '/'] = function metaResponse(req, res) {
     pkgJson.dist.tarball = `http://${req.headers.host}${tgzPath}`;
     const body = Buffer.from(JSON.stringify(upstreamPkgJson));
     res.writeHead(200, {
