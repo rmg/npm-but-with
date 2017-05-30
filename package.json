@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/rmg/npm-but-with/issues"
   },
-  "homepage": "https://github.com/rmg/npm-but-with#readme"
+  "homepage": "https://github.com/rmg/npm-but-with#readme",
+  "dependencies": {
+    "tar": "^3.1.3"
+  }
 }
