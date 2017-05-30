@@ -20,8 +20,8 @@ return addSeeds(process.argv.slice(2)).then(run).catch((err) => {
 });
 
 function addSeeds(tarballs) {
+  console.log('Proxying to %s with local overlays:', UPSTREAM);
   return Promise.all(tarballs.map(function(tgzPath) {
-    console.log('tarball:', tgzPath);
     return processTarball(tgzPath).then(makeSeedResponders);
   }));
 }
@@ -36,14 +36,17 @@ function makeSeedResponders(seed) {
   var tgzName = `${name}-${version}.tgz`;
   var tgzPath = `/${name}/-/${tgzName}`;
   var metaPath = `/${name}`;
+  if (upstreamPkgJson.versions[pkgJson.version]) {
+    console.log(' - %s@%s (upstream, %s)', name, version, upstreamPkgJson.versions[pkgJson.version].dist.shasum);
+  }
   upstreamPkgJson.versions[pkgJson.version] = pkgJson;
+  console.log(' + %s@%s (local, %s)', name, version, shasum);
   upstreamPkgJson['dist-tags'].latest = pkgJson.version;
   pkgJson.dist = {
     shasum: shasum,
     tarball: 'TBD',
   };
   upstreamPkgJson.time.modified = upstreamPkgJson.time[version] = (new Date()).toJSON();
-  console.log(upstreamPkgJson);
   seeds[metaPath] = seeds[`${metaPath}/`] = function metaResponse(req, res) {
     pkgJson.dist.tarball = `http://${req.headers.host}${tgzPath}`;
     var body = Buffer.from(JSON.stringify(upstreamPkgJson));
@@ -69,7 +72,6 @@ function processTarball(tgzName) {
   var upstreamPkgJson = pkgJson.then((json) => {
     return new Promise(function(resolve, reject) {
       var upstreamUrl = `${UPSTREAM}/${json.name}`;
-      console.log('fetching:', upstreamUrl);
       var req = upstreamGet(upstreamUrl, (res) => {
         var parts = [];
         res.on('data', (chunk) => {
@@ -158,7 +160,12 @@ function run() {
 }
 
 function onListen() {
-  console.log('listening on ', this.address());
+  console.log('Listening on http://0.0.0.0:%d', this.address().port);
+  console.log('To use this registry:');
+  console.log(' - run `npm config set registry http://127.0.0.1:%d`',
+              this.address().port);
+  console.log(' - or add `--registry=http://127.0.0.1:%d` to npm commands',
+              this.address().port);
 }
 
 function onRequest(req, res) {
