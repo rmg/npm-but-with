@@ -1,80 +1,88 @@
 'use strict';
 
-var crypto = require('crypto');
-var fs = require('fs');
-var http = require('http');
-var https = require('https');
-var tar = require('tar');
-var url = require('url');
+const crypto = require('crypto');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const tar = require('tar');
+const url = require('url');
 
 const PORT = process.env.PORT || 4873;
-const UPSTREAM = process.env.npm_config_registry || 'https://registry.npmjs.org';
+const UPSTREAM =
+  process.env.npm_config_registry || 'https://registry.npmjs.org';
 const registry = makeProxy(UPSTREAM);
 
 const upstreamGet = /^https:/.test(UPSTREAM) ? https.get : http.get;
 
-var seeds = {};
+const seeds = {};
 
-return addSeeds(process.argv.slice(2)).then(run).catch((err) => {
+addSeeds(process.argv.slice(2)).then(run).catch(err => {
   console.error('error:', err);
 });
 
 function addSeeds(tarballs) {
   console.log('Proxying to %s with local overlays:', UPSTREAM);
-  return Promise.all(tarballs.map(function(tgzPath) {
-    return processTarball(tgzPath).then(makeSeedResponders);
-  }));
+  return Promise.all(
+    tarballs.map(tgzPath => processTarball(tgzPath).then(makeSeedResponders))
+  );
 }
 
 function makeSeedResponders(seed) {
-  var shasum = seed.shasum;
-  var pkgJson = seed.pkgJson;
-  var upstreamPkgJson = seed.upstreamPkgJson;
-  var tgzSize = seed.tgzSize;
-  var name = pkgJson.name;
-  var version = pkgJson.version;
-  var tgzName = `${name}-${version}.tgz`;
-  var tgzPath = `/${name}/-/${tgzName}`;
-  var metaPath = `/${name}`;
+  const shasum = seed.shasum;
+  const pkgJson = seed.pkgJson;
+  const upstreamPkgJson = seed.upstreamPkgJson;
+  const tgzSize = seed.tgzSize;
+  const name = pkgJson.name;
+  const version = pkgJson.version;
+  const tgzName = `${name}-${version}.tgz`;
+  const tgzPath = `/${name}/-/${tgzName}`;
+  const metaPath = `/${name}`;
   if (upstreamPkgJson.versions[pkgJson.version]) {
-    console.log(' - %s@%s (upstream, %s)', name, version, upstreamPkgJson.versions[pkgJson.version].dist.shasum);
+    console.log(
+      ' - %s@%s (upstream, %s)',
+      name,
+      version,
+      upstreamPkgJson.versions[pkgJson.version].dist.shasum
+    );
   }
   upstreamPkgJson.versions[pkgJson.version] = pkgJson;
   console.log(' + %s@%s (local, %s)', name, version, shasum);
   upstreamPkgJson['dist-tags'].latest = pkgJson.version;
   pkgJson.dist = {
     shasum: shasum,
-    tarball: 'TBD',
+    tarball: 'TBD'
   };
-  upstreamPkgJson.time.modified = upstreamPkgJson.time[version] = (new Date()).toJSON();
+  upstreamPkgJson.time.modified = upstreamPkgJson.time[
+    version
+  ] = new Date().toJSON();
   seeds[metaPath] = seeds[`${metaPath}/`] = function metaResponse(req, res) {
     pkgJson.dist.tarball = `http://${req.headers.host}${tgzPath}`;
-    var body = Buffer.from(JSON.stringify(upstreamPkgJson));
+    const body = Buffer.from(JSON.stringify(upstreamPkgJson));
     res.writeHead(200, {
       'Content-Type': 'application/json',
-      'Content-Length': body.byteLength,
+      'Content-Length': body.byteLength
     });
     res.end(body);
   };
   seeds[tgzPath] = function tarballResponse(req, res) {
     res.writeHead(200, {
       'Content-Type': 'application/octet',
-      'Content-Length': tgzSize,
+      'Content-Length': tgzSize
     });
     fs.createReadStream(seed.path).pipe(res);
   };
 }
 
 function processTarball(tgzName) {
-  var tgzSize = sizeOf(tgzName);
-  var shasum = shasumOf(tgzName);
-  var pkgJson = extractPackageJson(tgzName);
-  var upstreamPkgJson = pkgJson.then((json) => {
-    return new Promise(function(resolve, reject) {
-      var upstreamUrl = `${UPSTREAM}/${json.name}`;
-      var req = upstreamGet(upstreamUrl, (res) => {
-        var parts = [];
-        res.on('data', (chunk) => {
+  const tgzSize = sizeOf(tgzName);
+  const shasum = shasumOf(tgzName);
+  const pkgJson = extractPackageJson(tgzName);
+  const upstreamPkgJson = pkgJson.then(json => {
+    return new Promise((resolve, reject) => {
+      const upstreamUrl = `${UPSTREAM}/${json.name}`;
+      const req = upstreamGet(upstreamUrl, res => {
+        const parts = [];
+        res.on('data', chunk => {
           parts.push(chunk);
         });
         res.on('end', () => {
@@ -92,27 +100,27 @@ function processTarball(tgzName) {
     shasum,
     pkgJson,
     upstreamPkgJson,
-    tgzSize,
-  ]).then((parts) => {
+    tgzSize
+  ]).then(parts => {
     return {
       path: tgzName,
       shasum: parts[0],
       pkgJson: parts[1],
       upstreamPkgJson: parts[2],
-      tgzSize: parts[3],
+      tgzSize: parts[3]
     };
   });
 }
 
 function extractPackageJson(tgzName) {
-  return new Promise(function(resolve, reject) {
-    var tgzStream = fs.createReadStream(tgzName);
-    tgzStream.pipe(new tar.Parse({filter: onlyPackageJson, onentry: readPackageJson}));
+  return new Promise((resolve, reject) => {
+    const tgzStream = fs.createReadStream(tgzName);
+    tgzStream.pipe(
+      new tar.Parse({ filter: onlyPackageJson, onentry: readPackageJson })
+    );
     function readPackageJson(entry) {
-      var bufs = [];
-      entry.on('data', function(chunk) {
-        bufs.push(chunk);
-      }).on('end', function() {
+      const bufs = [];
+      entry.on('data', chunk => bufs.push(chunk)).on('end', () => {
         try {
           resolve(JSON.parse(Buffer.concat(bufs).toString('utf8')));
         } catch (e) {
@@ -124,12 +132,11 @@ function extractPackageJson(tgzName) {
 }
 
 function shasumOf(filePath) {
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha1');
     hash.on('readable', () => {
       const data = hash.read();
-      if (data)
-        resolve(data.toString('hex'));
+      if (data) resolve(data.toString('hex'));
     });
     fs.createReadStream(filePath).pipe(hash);
     // TODO: 'error' on readStream and hash
@@ -137,8 +144,8 @@ function shasumOf(filePath) {
 }
 
 function sizeOf(filePath) {
-  return new Promise(function(resolve, reject) {
-    fs.stat(filePath, function(err, stat) {
+  return new Promise((resolve, reject) => {
+    fs.stat(filePath, (err, stat) => {
       if (err) {
         reject(err);
       } else {
@@ -153,30 +160,34 @@ function onlyPackageJson(path, entry) {
 }
 
 function run() {
-  http.createServer()
-      .on('request', onRequest)
-      .on('listening', onListen)
-      .listen(PORT, '0.0.0.0');
+  http
+    .createServer()
+    .on('request', onRequest)
+    .on('listening', onListen)
+    .listen(PORT, '0.0.0.0');
 }
 
 function onListen() {
   console.log('Listening on http://0.0.0.0:%d', this.address().port);
   console.log('To use this registry:');
-  console.log(' - run `npm config set registry http://127.0.0.1:%d`',
-              this.address().port);
-  console.log(' - or add `--registry=http://127.0.0.1:%d` to npm commands',
-              this.address().port);
+  console.log(
+    ' - run `npm config set registry http://127.0.0.1:%d`',
+    this.address().port
+  );
+  console.log(
+    ' - or add `--registry=http://127.0.0.1:%d` to npm commands',
+    this.address().port
+  );
 }
 
 function onRequest(req, res) {
   req.started = process.hrtime();
-  var seedResponder = seeds[req.url];
+  const seedResponder = seeds[req.url];
   if (seedResponder) {
     return seedResponder(req, res);
   }
-  var up = registry(req);
-  up.on('error', proxyError)
-    .on('response', proxyToRes);
+  const up = registry(req);
+  up.on('error', proxyError).on('response', proxyToRes);
   console.log(req.method, req.url);
 
   function proxyToRes(src) {
@@ -209,7 +220,7 @@ function makeProxy(upstream) {
       port: port,
       path: req.url,
       method: req.method,
-      headers: headers,
+      headers: headers
     };
     return req.pipe(proto.request(npmReqOpts));
   }
