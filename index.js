@@ -50,6 +50,7 @@ function makeSeedResponders(seed) {
   console.log(' + %s@%s (local, %s)', name, version, shasum);
   upstreamPkgJson['dist-tags'].latest = pkgJson.version;
   pkgJson.dist = {
+    // TODO: add integrity field with ssri
     shasum: shasum,
     tarball: 'generate me when we know what Host header the client sent'
   };
@@ -139,7 +140,9 @@ function shasumOf(filePath) {
     const hash = crypto.createHash('sha1');
     hash.on('readable', () => {
       const data = hash.read();
-      if (data) resolve(data.toString('hex'));
+      if (Buffer.isBuffer(data)) {
+        resolve(data.toString('hex'));
+      }
     });
     fs.createReadStream(filePath).pipe(hash);
     // TODO: 'error' on readStream and hash
@@ -163,11 +166,7 @@ function onlyPackageJson(path, entry) {
 }
 
 function run() {
-  http
-    .createServer()
-    .on('request', onRequest)
-    .on('listening', onListen)
-    .listen(PORT, '0.0.0.0');
+  http.createServer(onRequest).listen(PORT, '0.0.0.0', onListen);
 }
 
 function onListen() {
@@ -218,7 +217,7 @@ function makeProxy(upstream) {
     delete headers['host'];
     delete headers['connection'];
     delete headers['if-none-match'];
-    var npmReqOpts = {
+    const npmReqOpts = {
       hostname: hostname,
       port: port,
       path: req.url,
